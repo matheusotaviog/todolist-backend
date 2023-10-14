@@ -18,29 +18,28 @@ import org.springframework.web.bind.annotation.RestController;
 import br.com.matheusotaviog.todolist.utils.Utils;
 import jakarta.servlet.http.HttpServletRequest;
 
-
 @RestController
 @RequestMapping("/tasks")
 public class TaskController {
 
     @Autowired
     ITaskRepository taskRepository;
-    
+
     @PostMapping("/")
     public ResponseEntity create(@RequestBody TaskModel taskModel, HttpServletRequest request) {
         var idUser = request.getAttribute("idUser");
         taskModel.setIdUser((UUID) idUser);
 
         var currentDate = LocalDateTime.now();
-        if(currentDate.isAfter(taskModel.getStartAt()) || currentDate.isAfter(taskModel.getEndAt())) {
+        if (currentDate.isAfter(taskModel.getStartAt()) || currentDate.isAfter(taskModel.getEndAt())) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-            .body("A data inicial / data final deve ser maior que a data atual");
-        
+                    .body("A data inicial / data final deve ser maior que a data atual");
+
         }
-        
-        if(taskModel.getStartAt().isAfter(taskModel.getEndAt())) {
+
+        if (taskModel.getStartAt().isAfter(taskModel.getEndAt())) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-            .body("A data inicial deve ser menor que a data final");
+                    .body("A data inicial deve ser menor que a data final");
         }
 
         var task = this.taskRepository.save(taskModel);
@@ -54,15 +53,26 @@ public class TaskController {
         return list;
     }
 
-
     @PutMapping("/{id}")
-    public TaskModel update(@RequestBody TaskModel taskModel, @PathVariable UUID id, HttpServletRequest request) {
-        
+    public ResponseEntity update(@RequestBody TaskModel taskModel, @PathVariable UUID id, HttpServletRequest request) {
+
         var task = this.taskRepository.findById(id).orElse(null);
+        var idUser = request.getAttribute("idUser");
+
+        if (task == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Tarefa não encontrada.");
+        }
+
+        if (!task.getIdUser().equals(idUser)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Esse usuário não tem permissão para alterar essa tarefa.");
+        }
 
         Utils.copyNonNullProperties(taskModel, task);
 
-        return this.taskRepository.save(task);
+        var taskUpdated = this.taskRepository.save(task);
+        return ResponseEntity.status(HttpStatus.OK).body(taskUpdated);
     }
 
 }
